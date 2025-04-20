@@ -1,0 +1,52 @@
+services:
+  backend:
+    build: ./backend
+    ports:
+      - "5001:5000"
+    environment:
+      - PYTHONPATH=/app
+    networks:
+      - app-network
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "8080:80"
+    networks:
+      - app-network
+    depends_on:
+      websocket:
+        condition: service_healthy
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    ports:
+      - "25672:15672"
+      - "25673:5672"
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  websocket:
+    build: ./backend
+    command: python -m app.infrastructure.websocket.ws_server
+    ports:
+      - "8001:8000"
+    networks:
+      - app-network
+    healthcheck:  # <--- Nuevo healthcheck
+      test: ["CMD-SHELL", "curl -f http://localhost:8000 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+networks:
+  app-network:
+    driver: bridge
